@@ -1,8 +1,8 @@
 import sys;
 
 
-IMPLEMENTS = 1
-DEPENDS_ON = 2
+IMPLEMENTS = 0x1
+DEPENDS_ON = 0x1 << 1
 
 
 def printGrid(grid, names):
@@ -18,9 +18,9 @@ def printGrid(grid, names):
     print(paddedName + " ─", end="")
 
     for cell in row:
-      print("─" + cell, end="")
+      print(cell + "─", end="")
 
-    print("──")
+    print("")
 
 
 def parseDescription(desc):
@@ -29,16 +29,16 @@ def parseDescription(desc):
   names = ()
 
   for idx, depString in enumerate(descs):
-    name, impls, deps = depString.split(";")
-    names = names + (name,)
+    name, impls, deps = [s.strip() for s in depString.split(";")]
+    names += (name,)
 
     for i in impls.split(","):
       if i != '':
-        depMatrix[idx][names.index(i)] = IMPLEMENTS
+        depMatrix[idx][names.index(i)] |= IMPLEMENTS
 
     for d in deps.split(","):
       if d != '':
-        depMatrix[idx][names.index(d)] = DEPENDS_ON
+        depMatrix[idx][names.index(d)] |= DEPENDS_ON
 
   return names, depMatrix
 
@@ -47,31 +47,33 @@ def populateGrid(names, depMatrix):
   totalDeps = 0
   for row in depMatrix:
     for cell in row:
-      if cell == IMPLEMENTS or cell == DEPENDS_ON:
-        totalDeps = totalDeps + 1
+      if cell & IMPLEMENTS:
+        totalDeps += 1
+      if cell & DEPENDS_ON:
+        totalDeps += 1
 
   grid = [["─"] * totalDeps for i in names]
 
   cursor = 0
   for lhs, row in enumerate(depMatrix):
     for rhs, cell in enumerate(row):
-      if depMatrix[lhs][rhs] == IMPLEMENTS:
+      if depMatrix[lhs][rhs] & IMPLEMENTS:
         grid[lhs][cursor] = "┴"
 
         for r in range(1, lhs - rhs):
           grid[rhs + r][cursor] = "│"
 
         grid[rhs][cursor] = "▴"
-        cursor = cursor + 1
+        cursor += 1
 
-      elif depMatrix[lhs][rhs] == DEPENDS_ON:
-        grid[lhs][cursor] = "┴"
+      if depMatrix[lhs][rhs] & DEPENDS_ON:
+        grid[lhs][cursor] = "╨"
 
         for r in range(1, lhs - rhs):
-          grid[rhs + r][cursor] = "╎"
+          grid[rhs + r][cursor] = "║"
 
         grid[rhs][cursor] = "▴"
-        cursor = cursor + 1
+        cursor += 1
 
   return grid
 
