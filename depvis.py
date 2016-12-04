@@ -24,6 +24,7 @@ def printGraph(depMatrix, lines, width):
   for row, (name, item) in enumerate(depMatrix.items()):
     label = name + " " + item["version"]
     paddedLabel = label + " " * (maxLabelLen - len(label) + 1)
+
     print(paddedLabel, end="")
 
     cursor = 0
@@ -32,20 +33,21 @@ def printGraph(depMatrix, lines, width):
       cursor += 1
 
       if lines[col]["end"] == row:
-        cursor += padLine(lines[col], cursor)
-
         versionLabel = lines[col]["version"]
+
+        cursor += padLine(lines[col], cursor)
         print("▴" + versionLabel, end="")
+
         cursor += len("▴" + versionLabel)
       elif lines[col]["start"] == row:
         cursor += padLine(lines[col], cursor)
-
         print("┴" if lines[col]["type"] == IMPLEMENTS else "╨", end="")
+
         cursor += 1
       elif lines[col]["start"] > row and lines[col]["end"] < row:
         cursor += padLine(lines[col], cursor)
-
         print("│" if lines[col]["type"] == IMPLEMENTS else "║", end="")
+
         cursor += 1
       else:
         print("─", end="")
@@ -80,13 +82,9 @@ def parseDescription(description):
 
 
 def computeLines(depMatrix):
-  totalDeps = 0
-  for item in depMatrix.values():
-    totalDeps += len(item["implements"]) + len(item["dependsOn"])
-
   lines = ()
 
-  for idx, (name, item) in enumerate(depMatrix.items()):
+  for idx, item in enumerate(depMatrix.values()):
     for impl in item["implements"]:
       lines += tuple([{
         "start": idx,
