@@ -8,9 +8,9 @@ IMPLEMENTS = 1
 DEPENDS_ON = 2
 
 
-def padLine(line, cursor):
+def padLine(line, cursor, space):
   padding = line["x"] - cursor
-  print("─" * padding, end="")
+  print(space * padding, end="")
   return padding
 
 
@@ -22,38 +22,36 @@ def printGraph(depMatrix, lines, width):
       maxLabelLen = l
 
   for row, (name, item) in enumerate(depMatrix.items()):
+    space = " " if name == "" else "─"
+
     label = name + " " + item["version"]
     paddedLabel = label + " " * (maxLabelLen - len(label) + 1)
-
     print(paddedLabel, end="")
 
     cursor = 0
     for col in range(len(lines)):
-      print("─", end="")
+      print(space, end="")
       cursor += 1
 
       if lines[col]["end"] == row:
         versionLabel = lines[col]["version"]
 
-        cursor += padLine(lines[col], cursor)
+        cursor += padLine(lines[col], cursor, space)
         print("▴" + versionLabel, end="")
 
-        cursor += len("▴" + versionLabel)
+        cursor += len(versionLabel) + 1
       elif lines[col]["start"] == row:
-        cursor += padLine(lines[col], cursor)
+        cursor += padLine(lines[col], cursor, space)
         print("┴" if lines[col]["type"] == IMPLEMENTS else "╨", end="")
 
         cursor += 1
       elif lines[col]["start"] > row and lines[col]["end"] < row:
-        cursor += padLine(lines[col], cursor)
+        cursor += padLine(lines[col], cursor, space)
         print("│" if lines[col]["type"] == IMPLEMENTS else "║", end="")
 
         cursor += 1
-      else:
-        print("─", end="")
-        cursor += 1
 
-    print("─" * (width - cursor))
+    print(space * (width - cursor))
 
 
 def parseDescription(description):
@@ -64,7 +62,7 @@ def parseDescription(description):
     nameString, implsString, depsString = [s.strip() for s in desc.split(";")]
     name, version = nameString.partition("=")[::2]
 
-    item = ({"version": version, "implements": [], "dependsOn": []})
+    item = {"version": version, "implements": [], "dependsOn": []}
 
     for implPair in implsString.split(","):
       impl, version = implPair.partition("=")[::2]
