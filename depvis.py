@@ -1,86 +1,129 @@
-import sys;
+import sys
+from collections import OrderedDict
 
 
-IMPLEMENTS = 0x1
-DEPENDS_ON = 0x1 << 1
+IMPLEMENTS = 1
+DEPENDS_ON = 2
 
 
-def printGrid(grid, names):
-  maxLen = 0
-  for name in names:
-    if len(name) > maxLen:
-      maxLen = len(name)
-
-  for r, row in enumerate(grid):
-    name = names[r]
-    paddedName = name + " " * (maxLen - len(name))
-
-    print(paddedName + " ─", end="")
-
-    for cell in row:
-      print(cell + "─", end="")
-
-    print("")
+def padLine(line, cursor):
+  padding = line["x"] - cursor
+  print("─" * padding, end="")
+  return padding
 
 
-def parseDescription(desc):
-  descs = desc.split("/")
-  depMatrix = [[0] * len(descs) for d in descs]
-  names = ()
+def printGraph(depMatrix, lines, width):
+  maxLabelLen = 0
+  for name, item in depMatrix.items():
+    l = len(name + " " + item["version"])
+    if l > maxLabelLen:
+      maxLabelLen = l
 
-  for idx, depString in enumerate(descs):
-    name, impls, deps = [s.strip() for s in depString.split(";")]
-    names += (name,)
+  for row, (name, item) in enumerate(depMatrix.items()):
+    label = name + " " + item["version"]
+    paddedLabel = label + " " * (maxLabelLen - len(label) + 1)
+    print(paddedLabel, end="")
 
-    for i in impls.split(","):
-      if i != '':
-        depMatrix[idx][names.index(i)] |= IMPLEMENTS
+    cursor = 0
+    for col in range(len(lines)):
+      print("─", end="")
+      cursor += 1
 
-    for d in deps.split(","):
-      if d != '':
-        depMatrix[idx][names.index(d)] |= DEPENDS_ON
+      if lines[col]["end"] == row:
+        cursor += padLine(lines[col], cursor)
 
-  return names, depMatrix
+        versionLabel = lines[col]["version"]
+        print("▴" + versionLabel, end="")
+        cursor += len("▴" + versionLabel)
+      elif lines[col]["start"] == row:
+        cursor += padLine(lines[col], cursor)
+
+        print("┴" if lines[col]["type"] == IMPLEMENTS else "╨", end="")
+        cursor += 1
+      elif lines[col]["start"] > row and lines[col]["end"] < row:
+        cursor += padLine(lines[col], cursor)
+
+        print("│" if lines[col]["type"] == IMPLEMENTS else "║", end="")
+        cursor += 1
+      else:
+        print("─", end="")
+        cursor += 1
+
+    print("─" * (width - cursor))
 
 
-def populateGrid(names, depMatrix):
+def parseDescription(description):
+  descs = description.split("/")
+  depMatrix = OrderedDict()
+
+  for desc in descs:
+    nameString, implsString, depsString = [s.strip() for s in desc.split(";")]
+    name, version = nameString.partition("=")[::2]
+
+    item = ({"version": version, "implements": [], "dependsOn": []})
+
+    for implPair in implsString.split(","):
+      impl, version = implPair.partition("=")[::2]
+      if impl:
+        item["implements"] += [(list(depMatrix).index(impl), version)]
+
+    for depPair in depsString.split(","):
+      dep, version = depPair.partition("=")[::2]
+      if dep:
+        item["dependsOn"] += [(list(depMatrix).index(dep), version)]
+
+    depMatrix[name] = item
+
+  return depMatrix
+
+
+def computeLines(depMatrix):
   totalDeps = 0
-  for row in depMatrix:
-    for cell in row:
-      if cell & IMPLEMENTS:
-        totalDeps += 1
-      if cell & DEPENDS_ON:
-        totalDeps += 1
+  for item in depMatrix.values():
+    totalDeps += len(item["implements"]) + len(item["dependsOn"])
 
-  grid = [["─"] * totalDeps for i in names]
+  lines = ()
 
-  cursor = 0
-  for lhs, row in enumerate(depMatrix):
-    for rhs, cell in enumerate(row):
-      if depMatrix[lhs][rhs] & IMPLEMENTS:
-        grid[lhs][cursor] = "┴"
+  for idx, (name, item) in enumerate(depMatrix.items()):
+    for impl in item["implements"]:
+      lines += tuple([{
+        "start": idx,
+        "end": impl[0],
+        "version": impl[1],
+        "type": IMPLEMENTS
+      }])
 
-        for r in range(1, lhs - rhs):
-          grid[rhs + r][cursor] = "│"
+    for dep in item["dependsOn"]:
+      lines += tuple([{
+        "start": idx,
+        "end": dep[0],
+        "version": dep[1],
+        "type": DEPENDS_ON
+      }])
 
-        grid[rhs][cursor] = "▴"
-        cursor += 1
+  return lines
 
-      if depMatrix[lhs][rhs] & DEPENDS_ON:
-        grid[lhs][cursor] = "╨"
 
-        for r in range(1, lhs - rhs):
-          grid[rhs + r][cursor] = "║"
+def positionLines(lines):
+  prev = None
+  x = 1
+  for line in lines:
+    if prev:
+      if prev["end"] >= line["end"]:
+        x += len(prev["version"]) + 2
+      else:
+        x += 2
 
-        grid[rhs][cursor] = "▴"
-        cursor += 1
+    line["x"] = x
+    prev = line
 
-  return grid
+  return x + len(lines[-1]["version"]) + 2
 
 
 if __name__ == "__main__":
-  names, depMatrix = parseDescription(sys.argv[1])
-  grid = populateGrid(names, depMatrix)
+  depMatrix = parseDescription(sys.argv[1])
+  lines = computeLines(depMatrix)
+  width = positionLines(lines)
 
-  printGrid(grid, names)
+  printGraph(depMatrix, lines, width)
 
